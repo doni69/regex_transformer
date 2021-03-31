@@ -8,42 +8,47 @@ from test_regex import conservative_regex
 D=set("0123456789")
 W=set("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 S=set(" \t\n\r\v\f")
-ALL=D#set(map(chr,range(0x80))) #ASCII
+ALL=set(map(chr,range(0x80))) #ASCII
 
-def nfa(re,cat=True):
-  a=set()
-  n=fsm.epsilon(a) if cat else fsm.null(a)
-  neg=False
-  for op,av in re:
-    if op in (sre.LITERAL,sre.NOT_LITERAL,sre.ANY,sre.RANGE,sre.CATEGORY):
-      if op is sre.LITERAL:
-        av={chr(av)}
-      elif op is sre.NOT_LITERAL:
-        av=ALL-{chr(av)}
-      elif op is sre.ANY:
-        av=ALL-{"\n"} #unless re.M
-      elif op is sre.RANGE:
-        av=set(map(chr,range(av[0],av[1]+1)))
-      elif op is sre.CATEGORY:
-        av={
-      sre.CATEGORY_DIGIT:D,
-      sre.CATEGORY_NOT_DIGIT:ALL-D,
-      sre.CATEGORY_SPACE:S,
-      sre.CATEGORY_NOT_SPACE:ALL-S,
-      sre.CATEGORY_WORD:D|W,
-      sre.CATEGORY_NOT_WORD:ALL-D-W
-      }[av]
+def nfa(re):
+  def cs(op,av):
+    if op is sre.LITERAL:
+      return {chr(av)}
+    if op is sre.NOT_LITERAL:
+      return ALL-{chr(av)}
+    if op is sre.ANY:
+      return ALL-{"\n"} #unless re.M
+    if op is sre.RANGE:
+      return set(map(chr,range(av[0],av[1]+1)))
+    if op is sre.CATEGORY:
+      return {
+        sre.CATEGORY_DIGIT:D,
+        sre.CATEGORY_NOT_DIGIT:ALL-D,
+        sre.CATEGORY_SPACE:S,
+        sre.CATEGORY_NOT_SPACE:ALL-S,
+        sre.CATEGORY_WORD:D|W,
+        sre.CATEGORY_NOT_WORD:ALL-D-W
+        }[av]
+    if op is sre.IN:
+      s=set()
+      neg=False
+      for op,av in av:
+        if op is sre.NEGATE:
+          neg=True
+          continue
+        s|=cs(op,av)
       if neg:
-        av=ALL-av
-        a&=av
-      else:
-        a|=av
-      m=fsm.fsm(
-      a,{0,1},
-      0,{1},
+        s=ALL-s
+      return s
+  
+  a=set()
+  n=fsm.epsilon(a)
+  for op,av in re:
+    if op in (sre.LITERAL,sre.NOT_LITERAL,sre.ANY,sre.RANGE,sre.CATEGORY,sre.IN):
+      av=cs(op,av)
+      a|=av
+      m=fsm.fsm(a,{0,1},0,{1},
       {0:{i:1 for i in av}})
-    elif op is sre.IN:
-      m=nfa(av,False)
     elif op is sre.SUBPATTERN:
       m=nfa(av[-1])
     elif op is sre.BRANCH:
@@ -59,21 +64,9 @@ def nfa(re,cat=True):
         u|=fsm.epsilon(a)
         u*=av[1]-av[0]
       m+=u
-    elif op is sre.NEGATE:
-      neg=True
-      a=ALL.copy()
-      n|=fsm.fsm(
-      a,{0,1},0,{1},
-      {0:{i:1 for i in a}})
-      continue
     else:
       raise NotImplementedError(op,"Only true regular expressions supported :^)")
-    if cat:
-      n+=m
-    elif neg:
-      n&=m
-    else:
-      n|=m
+    n+=m
   return n
 
 def rx(n):
@@ -104,21 +97,21 @@ def rx(n):
   
   for i in reversed(range(len(st))):
     a=st[i]
-    l="("+"|".join(sorted(brz[a][a]))+")*" if brz[a][a] else ""
+    l="("+"|".join(brz[a][a])+")*" if brz[a][a] else ""
     del brz[a][a]
     for b in sorted(brz[a]):
       brz[a][b]={l+i for i in brz[a][b]}
     for j in range(i):
       b=st[j]
       if brz[b][a]:
-        u="("+"|".join(sorted(brz[b][a]))+")"
+        u="("+"|".join(brz[b][a])+")"
         del brz[b][a]
         for c in brz[a]:
           brz[b][c]|={u+i for i in brz[a][c]}
       else:
         del brz[b][a]
         
-  return "|".join(sorted(brz[a][acc]))
+  return "|".join(brz[a][acc])
 
 @given(conservative_regex())
 @settings(deadline=None)
