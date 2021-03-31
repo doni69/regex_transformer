@@ -86,7 +86,5 @@ def test_equivalence(r,data):
   s=data.draw(st.text())
   assert bool(re.match(r,s))==bool(re.match(u,s))
   
-#test_idempotence()
-#test_equivalence()
-
-print(fsm.null("").states)
+test_idempotence()
+test_equivalence()
