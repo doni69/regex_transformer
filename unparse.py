@@ -1,7 +1,7 @@
 import sre_constants as sre
 from sre_parse import parse
 import re, random, string
-from hypothesis import given, strategies as st,note
+from hypothesis import given, strategies as st, note
 from greenery import fsm, lego
 from test_regex import conservative_regex
 
@@ -21,7 +21,7 @@ def unparse(re):
         elif op is sre.ANY:
             s += "."
         elif op in (sre.MAX_REPEAT, sre.MIN_REPEAT):
-            s += unparse(av[2])
+            s += "(" + unparse(av[2]) + ")"
             if av[1] == sre.MAXREPEAT and av[0] < 2:
                 s += "*+"[av[0]]
             elif av[:2] == (0, 1):
@@ -38,7 +38,7 @@ def unparse(re):
                 # non-greedy
                 s += "?"
         elif op is sre.BRANCH:
-            s += "(?:"+"|".join(unparse(a) for a in av[1])+")"
+            s += "(" + "|".join(unparse(a) for a in av[1]) + ")"
         elif op is sre.SUBPATTERN:
             s += "(" + unparse(av[-1]) + ")"
         elif op is sre.IN:
@@ -93,5 +93,6 @@ def test_equivalence(r, data):
     s = data.draw(st.text())
     assert bool(re.match(r, s)) == bool(re.match(u, s))
 
-#test_idempotence()
-#test_equivalence()
+
+# test_idempotence()
+# test_equivalence()
